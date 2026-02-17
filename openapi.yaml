@@ -1,0 +1,726 @@
+openapi: 3.1.0
+info:
+  title: SMS Alert API
+  version: 2.0.0
+  description: "## Secure access\n\nAll SMSAlert Cloud API communications are encrypted\
+    \ using the HTTPS protocol or via SSL. Any unsecured call is rejected (only HTTP\
+    \ is not allowed) automatically.\n\nAuthentication is Auth Basic, Authorization\
+    \ header is required.\n\n```\nExample of creating BASIC AUTH\n\n$user = 'your_username';\n\
+    $apiKey = 'your_apikey';\n\necho sprintf('Basic %s', base64_encode($user . ':'\
+    \ . $apiKey));\n\n===========\nOUTPUT \nBasic eW91cl91c2VybmFtZTp5b3VyX2FwaWtleQ==\n\
+    ```\n\n## Spam Protection\n\nIn order to prevent SPAM and improve security access\
+    \ API requests are limited to 1 API calls every 2 seconds with a burst of 5 requests\
+    \ initially.\nIn case of violation, access is blocked until the next window is\
+    \ available\n\nThis limit can be increased if requested after a thorough analysis.\n\
+    \nWhen limit is reached the server will respond with a 429 HTTP STATUS Code\n\n\
+    In the header of the SMSAlert server response, you will find, among others, 3\
+    \ parameters:\n\n* X-RateLimit-Limit: - represents how many calls can be made\
+    \ in the X seconds window\n\n* X-RateLimit-Remaining - represents the number of\
+    \ calls remaining in the current X seconds window\n\n* X-RateLimit-Reset - represents\
+    \ UTC unix time when the new window of 10 seconds starts\n\n## Examples\n\nGo\
+    \ to https://github.com/smsalert-mobi/request-examples and check code mock examples\
+    \ in different programming languages\n\n---\n\n# WebHooks\n\n### Message Status\n\
+    In order to receive a message status in real time you need to define your URL\
+    \ where you want to receive updates in SMSAlert account settings.\n\nSMAlert will\
+    \ send a POST request with the following parameters:\n* `status`\n  * this can\
+    \ have the following values\n    * `terminal_accepted` - your message was received\
+    \ by the mobile operator\n    * `delivered` - your message was delivered to the\
+    \ end terminal (depending on what type of device you use this is not always sent,\
+    \ also some mobile operators to not always send this status even is requested)\n\
+    \    * `failed` - fore some reason you message has failed\n* `id`\n  * Represents\
+    \ the message id, you can use this to request the message details later.\n\nWe\
+    \ recommend to secure your endpoint wih a token / hash. ex: http://my-endoint.com/sms/status?token=12356789\n\
+    \nNotice that request will be sent only once, regardless on what status we receive.\n\
+    \nNew added messages have `pending` status and that is not sent via the hook.\
+    \ \nIn some situations messages may remain in `pending` status due to unforeseen\
+    \ events, like app loosing connection and system did not have time to check the\
+    \ status yet and automatically disable it, or you flood your app with messages.\n\
+    We recommend to implement the GET SMS status endpoint for these situations.\n\n\
+    \n### Received Message \nUsing our incoming rules it can be possible to add one\
+    \ or more hooks for the incoming messages based on a text pattern that message\
+    \ may contain or any incoming message.\n\nSimilar to message status our system\
+    \ will send a request to your defined URL with the following parameters:\n* `message`\n\
+    \  * incoming message text\n* `phone`\n  * sender's phone number\n* `date`\n \
+    \ * date when message was received\n* `modemId`\n  * the modem ID that received\
+    \ the message\n"
+servers:
+- url: https://smsalert.mobi/api
+tags:
+- name: Message
+  description: Send and manage messages (SMS/RCS/Whatsapp/Alertisimo/etc.)
+- name: Devices
+  description: List and manage devices connected to your SMSAlert account
+- name: Webhooks
+  description: Callbacks for message status and inbound messages
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: HTTP Basic Auth where username is your account username and password
+        is your API key.
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Invalid request
+        errorCode:
+          type: integer
+          example: 101
+        errorFields:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
+          description: Field-level validation errors (keyed by field name).
+      required:
+      - status
+      - message
+      - errorCode
+      additionalProperties: true
+    RateLimitHeaders:
+      type: object
+      properties:
+        X-RateLimit-Limit:
+          type: string
+        X-RateLimit-Remaining:
+          type: string
+        X-RateLimit-Reset:
+          type: string
+    SendMessageRequest:
+      type: object
+      required:
+      - phoneNumber
+      - message
+      properties:
+        phoneNumber:
+          type: string
+          description: Phone number in international format E164. If no prefix is added,
+            default country is added from your account settings.
+          example: '+40720123456'
+        message:
+          type: string
+          maxLength: 735
+          description: SMS text. Historically urlencoded in some clients; send as
+            plain text JSON.
+          example: Hello from SMSAlert
+        modemId:
+          type: string
+          nullable: true
+          description: Optional. Bypass outgoing rules and send via a specific modem
+            ID.
+        cleanupUtf8:
+          type: boolean
+          default: true
+          description: Try to convert to GSM 03.38 alphabet to reduce costs.
+        autoShortUrl:
+          type: boolean
+          default: false
+          description: Shorten URLs in the message to reduce length and enable click
+            tracking.
+      additionalProperties: false
+    SendMessageResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Message ID
+          example: 154bf74ff340eef2a98a33d052d49000
+        status:
+          type: boolean
+          example: true
+        smsCount:
+          type: integer
+          example: 1
+      required:
+      - status
+      additionalProperties: true
+    ScheduleMessageRequest:
+      type: object
+      required:
+      - modemId
+      - phoneNumber
+      - schedule
+      - message
+      properties:
+        modemId:
+          type: string
+          description: Send via a specific modem, bypassing outgoing rules.
+        phoneNumber:
+          type: string
+          example: '+40720123456'
+        schedule:
+          type: string
+          description: MySQL datetime `YYYY-MM-DD HH:MM:SS` in your account timezone
+            (default Europe/Bucharest).
+          example: '2026-02-20 14:30:00'
+          pattern: ^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$
+        message:
+          type: string
+          description: SMS text
+          example: 'Reminder: your appointment is tomorrow.'
+      additionalProperties: false
+    ScheduleMessageResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Scheduled message ID
+        smsCount:
+          type: integer
+          example: 1
+        status:
+          type: boolean
+          example: true
+      required:
+      - status
+      additionalProperties: true
+    SendBulkMessageRequest:
+      type: object
+      required:
+      - phoneList
+      - message
+      properties:
+        phoneList:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            example: '+40720123456'
+          description: Array of phone numbers (max 50). International format; if missing
+            prefix, default country is added from your account settings.
+        message:
+          type: string
+          description: SMS text
+          example: 'Promo: -10% this week.'
+      additionalProperties: false
+    SendBulkMessageResponse:
+      type: object
+      properties:
+        campaignId:
+          type: integer
+          description: Campaign ID created for this bulk request.
+        status:
+          type: boolean
+          example: true
+      required:
+      - status
+      additionalProperties: true
+    GetMessageStatusRequest:
+      type: object
+      required:
+      - id
+      properties:
+        id:
+          type: string
+          description: Message ID
+      additionalProperties: false
+    MessageDeliveryStatus:
+      type: string
+      description: Delivery status for a message.
+      enum:
+      - pending
+      - terminal_accepted
+      - delivered
+      - failed
+    GetMessageStatusResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+          example: true
+        messageStatus:
+          $ref: '#/components/schemas/MessageDeliveryStatus'
+        modemId:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+      required:
+      - status
+      additionalProperties: true
+    Pagination:
+      type: object
+      properties:
+        totalResults:
+          type: integer
+        totalPages:
+          type: integer
+        resultsPerPage:
+          type: integer
+        page:
+          type: integer
+      required:
+      - totalResults
+      - totalPages
+      - resultsPerPage
+      - page
+    Device:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Device identifier, up to 64 chars.
+        nickName:
+          type: string
+        lastSeen:
+          type: string
+          nullable: true
+          description: Date in ISO 8601 format `Y-m-d\TH:i:sP` when device was last
+            seen online.
+          example: '2026-02-17T08:12:33+02:00'
+        isOnline:
+          type: boolean
+          description: Device availability (not real-time).
+        connectionToken:
+          type: string
+          nullable: true
+          description: Connection token used for rendering mobile app QR.
+        version:
+          type: string
+          nullable: true
+      required:
+      - id
+      - nickName
+      - isOnline
+      additionalProperties: true
+    ListDevicesResponse:
+      allOf:
+      - type: object
+        properties:
+          status:
+            type: boolean
+            example: true
+        required:
+        - status
+      - $ref: '#/components/schemas/Pagination'
+      - type: object
+        properties:
+          data:
+            type: array
+            items:
+              $ref: '#/components/schemas/Device'
+        required:
+        - data
+      additionalProperties: true
+    SentMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 12367
+        message:
+          type: string
+          example: Example text
+        to:
+          type: string
+          example: '40720123456'
+        status:
+          $ref: '#/components/schemas/MessageDeliveryStatus'
+        failReason:
+          type: string
+          nullable: true
+        date:
+          type: string
+          example: '2022-12-08 13:23:14'
+      required:
+      - id
+      - message
+      - to
+      - status
+      - date
+      additionalProperties: true
+    ReceivedMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 12367
+        message:
+          type: string
+          example: Example text
+        from:
+          type: string
+          example: '40720123456'
+        seen:
+          type: boolean
+          example: true
+        date:
+          type: string
+          example: '2022-12-08 13:23:14'
+      required:
+      - id
+      - message
+      - from
+      - seen
+      - date
+      additionalProperties: true
+    ListSentMessagesResponse:
+      allOf:
+      - type: object
+        properties:
+          status:
+            type: boolean
+            example: true
+        required:
+        - status
+      - $ref: '#/components/schemas/Pagination'
+      - type: object
+        properties:
+          data:
+            type: array
+            items:
+              $ref: '#/components/schemas/SentMessage'
+        required:
+        - data
+      additionalProperties: true
+    ListReceivedMessagesResponse:
+      allOf:
+      - type: object
+        properties:
+          status:
+            type: boolean
+            example: true
+        required:
+        - status
+      - $ref: '#/components/schemas/Pagination'
+      - type: object
+        properties:
+          data:
+            type: array
+            items:
+              $ref: '#/components/schemas/ReceivedMessage'
+        required:
+        - data
+      additionalProperties: true
+    WebhookMessageStatusPayload:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/MessageDeliveryStatus'
+        id:
+          type: string
+          description: Message ID
+      required:
+      - status
+      - id
+      additionalProperties: true
+    WebhookReceivedMessagePayload:
+      type: object
+      properties:
+        message:
+          type: string
+        phone:
+          type: string
+        date:
+          type: string
+        modemId:
+          type: string
+      required:
+      - message
+      - phone
+      - date
+      - modemId
+      additionalProperties: true
+security:
+- basicAuth: []
+paths:
+  /v2/message/send:
+    post:
+      tags:
+      - Message
+      summary: Send a message
+      description: Send messages to your users (SMS, RCS, Telegram, etc.). Outgoing
+        rules decide routing unless modemId is provided.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+            examples:
+              example:
+                value:
+                  phoneNumber: '+40720123456'
+                  message: Hello from SMSAlert
+                  cleanupUtf8: true
+                  autoShortUrl: false
+      responses:
+        '200':
+          description: Message accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendMessageResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (invalid Basic Auth credentials)
+        '429':
+          description: Rate limit exceeded
+  /v2/message/schedule:
+    post:
+      tags:
+      - Message
+      summary: Schedule a message
+      description: Schedule an SMS to be sent at a future datetime in your account
+        timezone (default Europe/Bucharest).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleMessageRequest'
+            examples:
+              example:
+                value:
+                  modemId: 04568f2fda89fe4f
+                  phoneNumber: '+40720123456'
+                  schedule: '2026-02-20 14:30:00'
+                  message: 'Reminder: your appointment is tomorrow.'
+      responses:
+        '200':
+          description: Message scheduled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleMessageResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (invalid Basic Auth credentials)
+        '429':
+          description: Rate limit exceeded
+  /v2/message/bulk:
+    post:
+      tags:
+      - Message
+      summary: Send bulk message
+      description: Send an identical message to multiple recipients (max 50). A campaign
+        is created and rate-limited to avoid operator limits.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendBulkMessageRequest'
+            examples:
+              example:
+                value:
+                  phoneList:
+                  - '+40720123456'
+                  - '+40720123457'
+                  message: 'Promo: -10% this week.'
+      responses:
+        '200':
+          description: Campaign created / bulk accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendBulkMessageResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (invalid Basic Auth credentials)
+        '429':
+          description: Rate limit exceeded
+  /v2/message/getStatus:
+    post:
+      tags:
+      - Message
+      summary: Get message status
+      description: Get current delivery status for a message by ID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetMessageStatusRequest'
+            examples:
+              example:
+                value:
+                  id: 154bf74ff340eef2a98a33d052d49000
+      responses:
+        '200':
+          description: Status response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetMessageStatusResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (invalid Basic Auth credentials)
+        '429':
+          description: Rate limit exceeded
+  /v2/message/sent/list:
+    get:
+      tags:
+      - Message
+      summary: List sent messages
+      description: List your sent messages with pagination.
+      parameters:
+      - name: perPage
+        in: query
+        schema:
+          type: integer
+          maximum: 100
+          default: 10
+        description: Results per page (max 100)
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+        description: Page number
+      responses:
+        '200':
+          description: Paginated sent messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListSentMessagesResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (invalid Basic Auth credentials)
+        '429':
+          description: Rate limit exceeded
+  /v2/message/list:
+    get:
+      tags:
+      - Message
+      summary: List received messages
+      description: List your received messages with pagination.
+      parameters:
+      - name: perPage
+        in: query
+        schema:
+          type: integer
+          maximum: 100
+          default: 10
+        description: Results per page (max 100)
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+        description: Page number
+      responses:
+        '200':
+          description: Paginated received messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListReceivedMessagesResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (invalid Basic Auth credentials)
+        '429':
+          description: Rate limit exceeded
+  /v2/device/list:
+    get:
+      tags:
+      - Devices
+      summary: List devices
+      description: List account devices (mobile app, telegram app, whatsapp, modem
+        device, etc.).
+      parameters:
+      - name: perPage
+        in: query
+        schema:
+          type: integer
+          maximum: 10
+          default: 10
+        description: Results per page (max 10)
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+        description: Page number
+      responses:
+        '200':
+          description: Paginated devices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListDevicesResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (invalid Basic Auth credentials)
+        '429':
+          description: Rate limit exceeded
+webhooks:
+  messageStatus:
+    post:
+      tags:
+      - Webhooks
+      summary: Message status webhook
+      description: Sent once when a non-pending status is received (terminal_accepted,
+        delivered, failed).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookMessageStatusPayload'
+      responses:
+        '200':
+          description: OK
+  receivedMessage:
+    post:
+      tags:
+      - Webhooks
+      summary: Received message webhook
+      description: Sent when an incoming message matches your incoming rules (pattern-based
+        or all incoming).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookReceivedMessagePayload'
+      responses:
+        '200':
+          description: OK
