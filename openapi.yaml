@@ -43,11 +43,13 @@ info:
     \  * incoming message text\n* `phone`\n  * sender's phone number\n* `date`\n \
     \ * date when message was received\n* `modemId`\n  * the modem ID that received\
     \ the message\n"
+  license:
+    name: Proprietary
 servers:
 - url: https://smsalert.mobi/api
 tags:
 - name: Message
-  description: Send and manage messages (SMS/RCS/Whatsapp/Alertisimo/etc.)
+  description: Send and manage messages (SMS/RCS/Telegram/etc.)
 - name: Devices
   description: List and manage devices connected to your SMSAlert account
 - name: Webhooks
@@ -84,15 +86,6 @@ components:
       - message
       - errorCode
       additionalProperties: true
-    RateLimitHeaders:
-      type: object
-      properties:
-        X-RateLimit-Limit:
-          type: string
-        X-RateLimit-Remaining:
-          type: string
-        X-RateLimit-Reset:
-          type: string
     SendMessageRequest:
       type: object
       required:
@@ -101,20 +94,18 @@ components:
       properties:
         phoneNumber:
           type: string
-          description: Phone number in international format E164. If no prefix is added,
-            default country is added from your account settings.
+          description: Phone number in international format. If no prefix is added,default country is added from your account settings.
           example: '+40720123456'
         message:
           type: string
           maxLength: 735
-          description: SMS text. Historically urlencoded in some clients; send as
-            plain text JSON.
+          description: SMS text. Historically urlencoded in some clients; send as plain text JSON.
           example: Hello from SMSAlert
         modemId:
-          type: string
-          nullable: true
-          description: Optional. Bypass outgoing rules and send via a specific modem
-            ID.
+          type:
+          - string
+          - 'null'
+          description: Optional. Bypass outgoing rules and send via a specific modem ID.
         cleanupUtf8:
           type: boolean
           default: true
@@ -124,7 +115,6 @@ components:
           default: false
           description: Shorten URLs in the message to reduce length and enable click
             tracking.
-      additionalProperties: false
     SendMessageResponse:
       type: object
       properties:
@@ -140,7 +130,6 @@ components:
           example: 1
       required:
       - status
-      additionalProperties: true
     ScheduleMessageRequest:
       type: object
       required:
@@ -165,7 +154,6 @@ components:
           type: string
           description: SMS text
           example: 'Reminder: your appointment is tomorrow.'
-      additionalProperties: false
     ScheduleMessageResponse:
       type: object
       properties:
@@ -180,7 +168,6 @@ components:
           example: true
       required:
       - status
-      additionalProperties: true
     SendBulkMessageRequest:
       type: object
       required:
@@ -199,7 +186,6 @@ components:
           type: string
           description: SMS text
           example: 'Promo: -10% this week.'
-      additionalProperties: false
     SendBulkMessageResponse:
       type: object
       properties:
@@ -211,7 +197,6 @@ components:
           example: true
       required:
       - status
-      additionalProperties: true
     GetMessageStatusRequest:
       type: object
       required:
@@ -220,7 +205,6 @@ components:
         id:
           type: string
           description: Message ID
-      additionalProperties: false
     MessageDeliveryStatus:
       type: string
       description: Delivery status for a message.
@@ -238,14 +222,15 @@ components:
         messageStatus:
           $ref: '#/components/schemas/MessageDeliveryStatus'
         modemId:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         reason:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
       required:
       - status
-      additionalProperties: true
     Pagination:
       type: object
       properties:
@@ -271,8 +256,9 @@ components:
         nickName:
           type: string
         lastSeen:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
           description: Date in ISO 8601 format `Y-m-d\TH:i:sP` when device was last
             seen online.
           example: '2026-02-17T08:12:33+02:00'
@@ -280,17 +266,18 @@ components:
           type: boolean
           description: Device availability (not real-time).
         connectionToken:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
           description: Connection token used for rendering mobile app QR.
         version:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
       required:
       - id
       - nickName
       - isOnline
-      additionalProperties: true
     ListDevicesResponse:
       allOf:
       - type: object
@@ -309,7 +296,6 @@ components:
               $ref: '#/components/schemas/Device'
         required:
         - data
-      additionalProperties: true
     SentMessage:
       type: object
       properties:
@@ -325,8 +311,9 @@ components:
         status:
           $ref: '#/components/schemas/MessageDeliveryStatus'
         failReason:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         date:
           type: string
           example: '2022-12-08 13:23:14'
@@ -336,7 +323,6 @@ components:
       - to
       - status
       - date
-      additionalProperties: true
     ReceivedMessage:
       type: object
       properties:
@@ -361,7 +347,7 @@ components:
       - from
       - seen
       - date
-      additionalProperties: true
+
     ListSentMessagesResponse:
       allOf:
       - type: object
@@ -380,7 +366,6 @@ components:
               $ref: '#/components/schemas/SentMessage'
         required:
         - data
-      additionalProperties: true
     ListReceivedMessagesResponse:
       allOf:
       - type: object
@@ -399,7 +384,6 @@ components:
               $ref: '#/components/schemas/ReceivedMessage'
         required:
         - data
-      additionalProperties: true
     WebhookMessageStatusPayload:
       type: object
       properties:
@@ -411,7 +395,6 @@ components:
       required:
       - status
       - id
-      additionalProperties: true
     WebhookReceivedMessagePayload:
       type: object
       properties:
@@ -428,7 +411,22 @@ components:
       - phone
       - date
       - modemId
-      additionalProperties: true
+  headers:
+    X-RateLimit-Limit:
+      description: How many calls can be made in the current rate-limit window.
+      schema:
+        type: integer
+        example: 5
+    X-RateLimit-Remaining:
+      description: Number of calls remaining in the current window.
+      schema:
+        type: integer
+        example: 4
+    X-RateLimit-Reset:
+      description: UTC unix time when the window resets.
+      schema:
+        type: integer
+        example: 1739788800
 security:
 - basicAuth: []
 paths:
@@ -459,16 +457,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SendMessageResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '400':
           description: Invalid request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '401':
           description: Unauthorized (invalid Basic Auth credentials)
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+      operationId: post_v2_message_send
   /v2/message/schedule:
     post:
       tags:
@@ -496,16 +523,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScheduleMessageResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '400':
           description: Invalid request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '401':
           description: Unauthorized (invalid Basic Auth credentials)
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+      operationId: post_v2_message_schedule
   /v2/message/bulk:
     post:
       tags:
@@ -533,16 +589,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SendBulkMessageResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '400':
           description: Invalid request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '401':
           description: Unauthorized (invalid Basic Auth credentials)
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+      operationId: post_v2_message_bulk
   /v2/message/getStatus:
     post:
       tags:
@@ -566,16 +651,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetMessageStatusResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '400':
           description: Invalid request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '401':
           description: Unauthorized (invalid Basic Auth credentials)
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+      operationId: post_v2_message_getStatus
   /v2/message/sent/list:
     get:
       tags:
@@ -604,16 +718,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListSentMessagesResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '400':
           description: Invalid request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '401':
           description: Unauthorized (invalid Basic Auth credentials)
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+      operationId: get_v2_message_sent_list
   /v2/message/list:
     get:
       tags:
@@ -642,16 +785,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListReceivedMessagesResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '400':
           description: Invalid request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '401':
           description: Unauthorized (invalid Basic Auth credentials)
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+      operationId: get_v2_message_list
   /v2/device/list:
     get:
       tags:
@@ -681,16 +853,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListDevicesResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '400':
           description: Invalid request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '401':
           description: Unauthorized (invalid Basic Auth credentials)
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+      operationId: get_v2_device_list
 webhooks:
   messageStatus:
     post:
@@ -708,6 +909,7 @@ webhooks:
       responses:
         '200':
           description: OK
+      operationId: webhook_post_messageStatus
   receivedMessage:
     post:
       tags:
@@ -724,3 +926,4 @@ webhooks:
       responses:
         '200':
           description: OK
+      operationId: webhook_post_receivedMessage
