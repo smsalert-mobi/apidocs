@@ -49,7 +49,7 @@ servers:
 - url: https://smsalert.mobi/api
 tags:
 - name: Message
-  description: Send and manage messages (SMS/RCS/Telegram/etc.)
+  description: Send and manage messages (SMS/RCS/Whatsapp/etc.)
 - name: Devices
   description: List and manage devices connected to your SMSAlert account
 - name: Webhooks
@@ -59,8 +59,7 @@ components:
     basicAuth:
       type: http
       scheme: basic
-      description: HTTP Basic Auth where username is your account username and password
-        is your API key.
+      description: HTTP Basic Auth where username is your account username and password is your API key.
   schemas:
     ErrorResponse:
       type: object
@@ -104,7 +103,6 @@ components:
         modemId:
           type:
           - string
-          - 'null'
           description: Optional. Bypass outgoing rules and send via a specific modem ID.
         cleanupUtf8:
           type: boolean
